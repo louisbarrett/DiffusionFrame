@@ -1,0 +1,7 @@
+requests
+waveshare_epaper
+Pillow
+opencv-python
+numpy
+gradio
+argparse
