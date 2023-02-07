@@ -1,4 +1,3 @@
-
 import gradio as gr
 #!/usr/bin/python
 # -*- coding:utf-8 -*-
@@ -20,10 +19,16 @@ import numpy as np
 display_type = "epd5in65f"
 
 # gradio inference url
-gradio_inference_url = "http://remotehost:7860/run/predict"
+gradio_inference_url = "http://goldrush:7860/run/predict"
 
 def load_image_and_resize(image, size=(224, 224)):
-    image = image.resize(size)
+    print("load and resize received ",type(image))
+    if type(image) ==  np.ndarray:
+        image_new = np.resize(image, size)
+        image = image_new
+        image =  Image.fromarray(image.astype('uint8'))
+    else:  
+        image = image.resize(size)
     return image
 
 
@@ -57,6 +62,7 @@ def display_image(image):
         epd.init()
         epd.Clear()
         image = load_image_and_resize(image, size=(epd.height, epd.width))
+        print("display image received",type(image))
         epd.display(epd.getbuffer(image))
  
     except IOError as e:
@@ -69,9 +75,18 @@ def display_image(image):
     return
 
 def reduce_to_7_colors(image):
-    image = image.convert("P", palette=Image.ADAPTIVE, colors=7)
+    if type(image) == np.ndarray:
+        image = Image.fromarray(image, 'RGB')
+        image = image.convert("P", palette=Image.ADAPTIVE, colors=7)
+    else:
+                image = image.convert("P", palette=Image.ADAPTIVE, colors=7)
     return image
 
+def upload_and_display(image):
+    # reduce the image to 7 colors
+    print("upload_and_display received a ",type(image))
+    image = reduce_to_7_colors(image)
+    display_image(image)
 
 def diffuse_and_display(prompt, num_inference_steps=100, guidance_scale=1, negative_prompt=None):
     # send the request to the server
@@ -89,15 +104,13 @@ def diffuse_and_display(prompt, num_inference_steps=100, guidance_scale=1, negat
 # prompt from args
 
 argparser = argparse.ArgumentParser()
-argparser.add_argument("--learned_embeds_path", type=str,default="./model_output")
-argparser.add_argument("--all",type=bool, default=False)
 argparser.add_argument("--share",type=bool, default=False)
 argparser.add_argument("--port",type=int, default=7860)
 
 gradio_port = argparser.parse_args().port
 arg_share = argparser.parse_args().share
 
-gr.Interface(diffuse_and_display,
+generateImage = gr.Interface(diffuse_and_display,
     [
         "text",
         gr.Slider(2, 800, value=40, label="inference steps"),
@@ -110,10 +123,27 @@ title="Diffusion Frame 🖼️",
 outputs="text",
 description="Uses StableDiffusion to push images to digital picture frame",
 
-).launch(
+)
+
+# upload image 
+uploadImage = gr.Interface(upload_and_display,
+    [
+    "image",
+    ],
+analytics_enabled=False,
+allow_flagging="never",     
+title="Diffusion Frame 🖼️",
+outputs="text",
+description="upload push images to digital picture frame",
+)
+
+
+gr.TabbedInterface([generateImage, uploadImage],["generate","upload"]).launch(
 server_name="0.0.0.0",
 server_port=gradio_port,
 enable_queue=True,
 show_api=False,
 share = arg_share,
+# favicon_path="favicon.ico",
+
 )
